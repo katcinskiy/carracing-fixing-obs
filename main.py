@@ -1,90 +1,131 @@
+import os
+
 import gymnasium as gym
-from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv
+import hydra
+from hydra.core.config_store import ConfigStore
+from omegaconf import OmegaConf
+from stable_baselines3 import PPO, A2C, DDPG, SAC, DQN, TD3
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-import torch.nn as nn
-import torch
-import ffmpeg
-import cv2
+from stable_baselines3.common.vec_env import SubprocVecEnv
 
-from env.car_racing import CarRacing
+from callbacks.eval_callback import EvalCallback
+from conf.config_models import AppConfig
+from env.car_racing import CarRacing, set_obs_width_height
+from wrapper.env_wrapper import CustomEnvWrapper
 
-from tqdm.auto import tqdm
-
-from PIL import Image
-
-from gymnasium.spaces import Box
-
-import numpy as np
+cs = ConfigStore.instance()
+cs.store(name="base_config", node=AppConfig)
 
 
-def create_video_from_frames(frames, output_video_path, fps=24):
-    # Check if the frame list is empty
-    if not frames:
-        print("The frame list is empty. No video will be created.")
-        return
+def make_algorithm(algo_name, **kwargs):
+    algorithms = {
+        "PPO": PPO,
+        "A2C": A2C,
+        "DDPG": DDPG,
+        "SAC": SAC,
+        "DQN": DQN,
+        "TD3": TD3
+    }
 
-    # Determine the size of the first frame
-    height, width = frames[0].shape[:2]
-
-    # Define the codec and create VideoWriter object
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # For MP4 file
-    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
-
-    for frame in frames:
-        # Convert frames to the correct color format if necessary
-        if frame.ndim == 2 or frame.shape[2] == 1:
-            # If the frame is grayscale, convert it to BGR
-            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-        elif frame.shape[2] == 4:
-            # If the frame has an alpha channel, convert it to BGR
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-
-        # Ensure the frame size matches the video size
-        if (frame.shape[0] != height) or (frame.shape[1] != width):
-            print("Frame size does not match video size. Resizing frame.")
-            frame = cv2.resize(frame, (width, height))
-
-        out.write(frame)
-
-    out.release()
-    print(f"Video saved to {output_video_path}")
+    if algo_name in algorithms:
+        algo_class = algorithms[algo_name]
+        return algo_class(**kwargs)
+    else:
+        raise ValueError(f"Unsupported algorithm: {algo_name}")
 
 
-def rgb2gray(rgb):
-    return np.dot(rgb[..., :3], [0.2989, 0.5870, 0.1140])[..., np.newaxis]
+@hydra.main(version_base=None, config_path="conf", config_name="config")
+def my_app(cfg: AppConfig) -> None:
+    folders_to_create = [
+        cfg.log_dir,
+        cfg.eval.video_save_path,
+        cfg.eval.model_save_path,
+        cfg.algo_cfg.tensorboard_log
+    ]
 
+    for folder in folders_to_create:
+        os.makedirs(folder, exist_ok=True)
 
-frames = []
+    yaml_config = OmegaConf.to_yaml(cfg)
+    with open(cfg.log_dir + '/config.yaml', 'w') as f:
+        f.write(yaml_config)
 
+    print(
+        f"###########################################################################\nRunning experiment with config: \n\n{yaml_config}\n\n###########################################################################")
 
-class CustomEnvWrapper(gym.Wrapper):
-    def __init__(self, env):
-        super(CustomEnvWrapper, self).__init__(env)
-        self.observation_space = Box(low=0, high=255, shape=(*self.observation_space.shape[:2], 1), dtype=np.uint8)
+    set_obs_width_height(cfg.env.obs_width, cfg.env.obs_height)
 
-    def reset(self, **kwargs):
-        observation = self.env.reset(**kwargs)
-        return rgb2gray(observation[0]), observation[1]
+    if cfg.env.wrapper.use:
+        base_env_fun = lambda: CustomEnvWrapper(
+            gym.wrappers.TimeLimit(
+                CarRacing(
+                    verbose=False,
+                    domain_randomize=cfg.env.domain_randomize,
+                    continuous=cfg.env.continuous
+                ),
+                cfg.env.max_episode_steps
+            ),
+            trajectory_color_max_speed=cfg.env.wrapper.trajectory_color_max_speed,
+            trajectory_thickness=cfg.env.wrapper.trajectory_thickness,
+            draw_for_last=cfg.env.wrapper.draw_for_last,
+        )
 
-    def step(self, action):
-        modified_action = action
-        observation, reward, truncated, done, info = self.env.step(modified_action)
-        return rgb2gray(observation), reward, truncated, done, info
+        eval_env = CustomEnvWrapper(
+            gym.wrappers.TimeLimit(
+                CarRacing(
+                    verbose=False,
+                    domain_randomize=cfg.env.domain_randomize,
+                    continuous=cfg.env.continuous,
+                    render_mode='rgb_array'
+                ),
+                cfg.env.max_episode_steps
+            ),
+            trajectory_color_max_speed=cfg.env.wrapper.trajectory_color_max_speed,
+            trajectory_thickness=cfg.env.wrapper.trajectory_thickness,
+            draw_for_last=cfg.env.wrapper.draw_for_last,
+        )
+    else:
+        base_env_fun = lambda: gym.wrappers.TimeLimit(
+            CarRacing(
+                verbose=False,
+                domain_randomize=cfg.env.domain_randomize,
+                continuous=cfg.env.continuous
+            ),
+            cfg.env.max_episode_steps
+        )
+
+        eval_env = gym.wrappers.TimeLimit(
+            CarRacing(
+                verbose=False,
+                domain_randomize=cfg.env.domain_randomize,
+                continuous=cfg.env.continuous,
+                render_mode='rgb_array'
+            ),
+            cfg.env.max_episode_steps
+        )
+
+    if cfg.train.n_envs == 1:
+        env = make_vec_env(base_env_fun, n_envs=1)
+    else:
+        env = make_vec_env(
+            base_env_fun,
+            n_envs=cfg.train.n_envs,
+            vec_env_cls=SubprocVecEnv
+        )
+
+    algo = make_algorithm(cfg.algo_name, env=env, **OmegaConf.to_container(cfg.algo_cfg, resolve=True))
+
+    algo.learn(
+        total_timesteps=cfg.train.total_timesteps,
+        tb_log_name=cfg.name,
+        callback=[
+            EvalCallback(
+                eval_env=eval_env,
+                **OmegaConf.to_container(cfg.eval, resolve=True)
+            ),
+        ],
+        progress_bar=True)
 
 
 if __name__ == '__main__':
-    env = make_vec_env(lambda: CustomEnvWrapper(CarRacing(continuous=False, verbose=True, render_mode='human')),
-                       n_envs=1)
-
-    model = PPO("CnnPolicy", env, verbose=1)
-
-    obs = env.reset()
-    for _ in tqdm(range(1000)):
-        frames.append(obs[0])
-        action, _states = model.predict(obs, deterministic=False)
-        obs, rewards, dones, info = env.step(action)
-        env.render()
-
-    create_video_from_frames(frames, 'output.mp4')
+    my_app()

@@ -1,0 +1,32 @@
+name: PPO_1
+log_dir: ./logs/${name}
+env:
+  wrapper:
+    use: true
+    trajectory_color_max_speed: 75
+    trajectory_thickness: 1
+    draw_for_last: 100
+  max_episode_steps: 1000
+  domain_randomize: false
+  continuous: false
+  obs_width: 100
+  obs_height: 100
+train:
+  total_timesteps: 1000000
+  n_envs: 5
+eval:
+  video_save_path: ${log_dir}/videos/
+  model_save_path: ${log_dir}/models/
+  eval_freq: 100000
+  n_eval_episodes: 3
+  deterministic: true
+algo_name: PPO
+algo_cfg:
+  policy: CnnPolicy
+  learning_rate: 0.0003
+  n_steps: 2048
+  batch_size: 256
+  n_epochs: 10
+  gamma: 0.99
+  verbose: 1
+  tensorboard_log: ./logs/tb/

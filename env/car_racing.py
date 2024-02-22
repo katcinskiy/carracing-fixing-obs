@@ -11,7 +11,6 @@ from gymnasium.envs.box2d.car_dynamics import Car
 from gymnasium.error import DependencyNotInstalled, InvalidAction
 from gymnasium.utils import EzPickle
 
-
 try:
     import Box2D
     from Box2D.b2 import contactListener, fixtureDef, polygonShape
@@ -30,21 +29,19 @@ except ImportError as e:
         "pygame is not installed, run `pip install gymnasium[box2d]`"
     ) from e
 
-
-STATE_W = 300  # less than Atari 160x192
-STATE_H = 300
+STATE_W = 100  # less than Atari 160x192
+STATE_H = 100
 VIDEO_W = 600
 VIDEO_H = 400
 WINDOW_W = 1000
-WINDOW_H = 800
+WINDOW_H = 1200
 
 SCALE = 6.0  # Track scale
 TRACK_RAD = 900 / SCALE  # Track is heavily morphed circle with this radius
 PLAYFIELD = 2000 / SCALE  # Game over boundary
 FPS = 50  # Frames per second
-ZOOM = 2.7  # Camera zoom
+ZOOM = 2.0  # Camera zoom
 ZOOM_FOLLOW = True  # Set to False for fixed view (don't use zoom)
-
 
 TRACK_DETAIL_STEP = 21 / SCALE
 TRACK_TURN_RATE = 0.31
@@ -53,8 +50,14 @@ BORDER = 8 / SCALE
 BORDER_MIN_COUNT = 4
 GRASS_DIM = PLAYFIELD / 20.0
 MAX_SHAPE_DIM = (
-    max(GRASS_DIM, TRACK_WIDTH, TRACK_DETAIL_STEP) * math.sqrt(2) * ZOOM * SCALE
+        max(GRASS_DIM, TRACK_WIDTH, TRACK_DETAIL_STEP) * math.sqrt(2) * ZOOM * SCALE
 )
+
+
+def set_obs_width_height(width, height):
+    global STATE_W, STATE_H
+    STATE_W = width
+    STATE_H = height
 
 
 class FrictionDetector(contactListener):
@@ -96,9 +99,9 @@ class FrictionDetector(contactListener):
 
                 # Lap is considered completed if enough % of the track was covered
                 if (
-                    tile.idx == 0
-                    and self.env.tile_visited_count / len(self.env.track)
-                    > self.lap_complete_percent
+                        tile.idx == 0
+                        and self.env.tile_visited_count / len(self.env.track)
+                        > self.lap_complete_percent
                 ):
                     self.env.new_lap = True
         else:
@@ -202,12 +205,12 @@ class CarRacing(gym.Env, EzPickle):
     }
 
     def __init__(
-        self,
-        render_mode: Optional[str] = None,
-        verbose: bool = False,
-        lap_complete_percent: float = 0.95,
-        domain_randomize: bool = False,
-        continuous: bool = True,
+            self,
+            render_mode: Optional[str] = None,
+            verbose: bool = False,
+            lap_complete_percent: float = 0.95,
+            domain_randomize: bool = False,
+            continuous: bool = True,
     ):
         EzPickle.__init__(
             self,
@@ -387,7 +390,7 @@ class CarRacing(gym.Env, EzPickle):
             if i == 0:
                 return False  # Failed
             pass_through_start = (
-                track[i][0] > self.start_alpha and track[i - 1][0] <= self.start_alpha
+                    track[i][0] > self.start_alpha and track[i - 1][0] <= self.start_alpha
             )
             if pass_through_start and i2 == -1:
                 i2 = i
@@ -399,7 +402,7 @@ class CarRacing(gym.Env, EzPickle):
         assert i1 != -1
         assert i2 != -1
 
-        track = track[i1 : i2 - 1]
+        track = track[i1: i2 - 1]
 
         first_beta = track[0][1]
         first_perp_x = math.cos(first_beta)
@@ -488,10 +491,10 @@ class CarRacing(gym.Env, EzPickle):
         return True
 
     def reset(
-        self,
-        *,
-        seed: Optional[int] = None,
-        options: Optional[dict] = None,
+            self,
+            *,
+            seed: Optional[int] = None,
+            options: Optional[dict] = None,
     ):
         super().reset(seed=seed)
         self._destroy()
@@ -527,7 +530,7 @@ class CarRacing(gym.Env, EzPickle):
 
         if self.render_mode == "human":
             self.render()
-        return self.step(None)[0], {}
+        return self.step(None)[0], self.get_car_state()
 
     def step(self, action: Union[np.ndarray, int]):
         assert self.car is not None
@@ -574,7 +577,14 @@ class CarRacing(gym.Env, EzPickle):
 
         if self.render_mode == "human":
             self.render()
-        return self.state, step_reward, terminated, truncated, {}
+        return self.state, step_reward, terminated, truncated, self.get_car_state()
+
+    def get_car_state(self):
+        return {'x': self.car.hull.position.x, 'y': self.car.hull.position.y, 'heading': self.car.hull.angle,
+                'speed': np.sqrt(
+                    np.square(self.car.hull.linearVelocity[0])
+                    + np.square(self.car.hull.linearVelocity[1])
+                )}
 
     def render(self):
         if self.render_mode is None:
@@ -626,7 +636,7 @@ class CarRacing(gym.Env, EzPickle):
         self.surf = pygame.transform.flip(self.surf, False, True)
 
         # showing stats
-        self._render_indicators(WINDOW_W, WINDOW_H)
+        # self._render_indicators(WINDOW_W, WINDOW_H)
 
         font = pygame.font.Font(pygame.font.get_default_font(), 42)
         text = font.render("%04i" % self.reward, True, (255, 255, 255), (0, 0, 0))
@@ -755,7 +765,7 @@ class CarRacing(gym.Env, EzPickle):
         )
 
     def _draw_colored_polygon(
-        self, surface, poly, color, zoom, translation, angle, clip=True
+            self, surface, poly, color, zoom, translation, angle, clip=True
     ):
         poly = [pygame.math.Vector2(c).rotate_rad(angle) for c in poly]
         poly = [
@@ -767,9 +777,9 @@ class CarRacing(gym.Env, EzPickle):
         # is greater than the screen by MAX_SHAPE_DIM, which is the maximum
         # diagonal length of an environment object
         if not clip or any(
-            (-MAX_SHAPE_DIM <= coord[0] <= WINDOW_W + MAX_SHAPE_DIM)
-            and (-MAX_SHAPE_DIM <= coord[1] <= WINDOW_H + MAX_SHAPE_DIM)
-            for coord in poly
+                (-MAX_SHAPE_DIM <= coord[0] <= WINDOW_W + MAX_SHAPE_DIM)
+                and (-MAX_SHAPE_DIM <= coord[1] <= WINDOW_H + MAX_SHAPE_DIM)
+                for coord in poly
         ):
             gfxdraw.aapolygon(self.surf, poly, color)
             gfxdraw.filled_polygon(self.surf, poly, color)
@@ -789,6 +799,7 @@ class CarRacing(gym.Env, EzPickle):
 
 if __name__ == "__main__":
     a = np.array([0.0, 0.0, 0.0])
+
 
     def register_input():
         global quit, restart
@@ -819,6 +830,7 @@ if __name__ == "__main__":
 
             if event.type == pygame.QUIT:
                 quit = True
+
 
     env = CarRacing(render_mode="human")
 

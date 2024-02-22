@@ -1,0 +1,8 @@
+defaults:
+  - config  # Reference the main configuration
+
+name: exp2_PPO_without_wrapper
+
+env:
+  wrapper:
+    use: false
