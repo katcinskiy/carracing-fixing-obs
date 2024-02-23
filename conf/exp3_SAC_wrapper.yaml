@@ -1,0 +1,12 @@
+defaults:
+  - config  # Reference the main configuration
+
+name: exp3_SAC_wrapper
+
+env:
+  wrapper:
+    use: true
+
+algo_name: SAC
+algo_cfg:
+  buffer_size: 300_000

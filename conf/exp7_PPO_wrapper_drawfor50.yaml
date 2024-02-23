@@ -1,0 +1,14 @@
+defaults:
+  - config  # Reference the main configuration
+
+name: exp7_PPO_wrapper_drawfor50
+
+env:
+  wrapper:
+    use: true
+    draw_for_last: 50
+
+algo_name: PPO
+algo_cfg:
+  n_steps: 2048
+  n_epochs: 10

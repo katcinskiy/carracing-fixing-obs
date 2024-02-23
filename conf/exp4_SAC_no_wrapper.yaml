@@ -1,0 +1,12 @@
+defaults:
+  - config  # Reference the main configuration
+
+name: exp4_SAC_no_wrapper
+
+env:
+  wrapper:
+    use: false
+
+algo_name: SAC
+algo_cfg:
+  buffer_size: 300_000

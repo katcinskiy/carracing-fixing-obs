@@ -1,0 +1,13 @@
+defaults:
+  - config  # Reference the main configuration
+
+name: exp1_PPO_wrapper
+
+env:
+  wrapper:
+    use: true
+
+algo_name: PPO
+algo_cfg:
+  n_steps: 2048
+  n_epochs: 10

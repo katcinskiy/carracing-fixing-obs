@@ -1,0 +1,14 @@
+defaults:
+  - config  # Reference the main configuration
+
+name: exp5_PPO_wrapper_thickness2
+
+env:
+  wrapper:
+    use: true
+    trajectory_thickness: 2
+
+algo_name: PPO
+algo_cfg:
+  n_steps: 2048
+  n_epochs: 10

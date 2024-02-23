@@ -1,0 +1,14 @@
+defaults:
+  - config  # Reference the main configuration
+
+name: exp6_PPO_wrapper_maxcolor50
+
+env:
+  wrapper:
+    use: true
+    trajectory_color_max_speed: 50
+
+algo_name: PPO
+algo_cfg:
+  n_steps: 2048
+  n_epochs: 10

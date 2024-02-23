@@ -24,6 +24,8 @@ def create_video_from_frames(frames, output_video_path, fps=50):
         if frame.ndim == 2 or frame.shape[2] == 1:
             # If the frame is grayscale, convert it to BGR
             frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+        elif frame.shape[2] == 3:
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         elif frame.shape[2] == 4:
             # If the frame has an alpha channel, convert it to BGR
             frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)

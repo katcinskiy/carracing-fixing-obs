@@ -1,8 +1,0 @@
-defaults:
-  - config  # Reference the main configuration
-
-name: exp1_PPO_with_wrapper
-
-env:
-  wrapper:
-    use: true

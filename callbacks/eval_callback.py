@@ -44,15 +44,16 @@ class EvalCallback(BaseCallback):
                     # frame = np.flip(np.rot90(self.eval_env.render(), 3), axis=1)
                     frame = self.eval_env.render()
                     orig_frames.append(frame)
-                    obs_frames.append(np.repeat(obs, 3, axis=2))
+                    if obs.shape[-1] == 1:
+                        obs_frames.append(np.repeat(obs, 3, axis=2))
+                    else:
+                        obs_frames.append(obs)
                     cur_reward += reward
 
                 all_orig_frames.append(orig_frames)
                 all_obs_frames.append(obs_frames)
                 all_rewards.append(cur_reward)
 
-                # (0, 2, 1) - No
-                #
                 self.logger.record(
                     f"eval/original_video_{i}",
                     Video(torch.ByteTensor(np.array(orig_frames)[np.newaxis, ...]).permute((0, 1, 4, 2, 3)), fps=40),
