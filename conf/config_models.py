@@ -19,6 +19,13 @@ class TrainConfig:
     n_envs: int
     tensorboard_log_dir: str
 
+    brake_penalty_reward: float
+    brake_penalty_th: float
+
+    steer_penalty_actions_len: int
+    steer_penalty_th: int
+    steer_penalty_reward: float
+
 
 @dataclass
 class EvalConfig:
@@ -31,10 +38,12 @@ class EvalConfig:
 
 @dataclass
 class WrapperConfig:
-    use: bool
+    use_custom: bool
     trajectory_color_max_speed: int
     trajectory_thickness: int
     draw_for_last: int
+    use_frame_stack: bool
+    frame_stack_count: int
 
 
 @dataclass

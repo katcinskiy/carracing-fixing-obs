@@ -5,7 +5,7 @@ name: exp2_PPO_no_wrapper
 
 env:
   wrapper:
-    use: false
+    use_custom: false
 
 algo_name: PPO
 algo_cfg:

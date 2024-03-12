@@ -1,13 +1,20 @@
 defaults:
   - config  # Reference the main configuration
 
-name: exp8_PPO_wrapper_drawfor300
+name: test_config
 
 env:
   wrapper:
     use: true
-    draw_for_last: 300
 
+train:
+  n_envs: 1
+  steer_penalty_actions_len: 50
+  steer_penalty_th: 20
+  steer_penalty_reward: -5
+
+eval:
+  eval_freq: 1000
 algo_name: PPO
 algo_cfg:
   n_steps: 2048

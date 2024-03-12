@@ -211,6 +211,11 @@ class CarRacing(gym.Env, EzPickle):
             lap_complete_percent: float = 0.95,
             domain_randomize: bool = False,
             continuous: bool = True,
+            brake_penalty_reward: float = None,
+            brake_penalty_th: float = None,
+            steer_penalty_actions_len: int = None,
+            steer_penalty_th: int = None,
+            steer_penalty_reward: int = None
     ):
         EzPickle.__init__(
             self,
@@ -259,6 +264,21 @@ class CarRacing(gym.Env, EzPickle):
         )
 
         self.render_mode = render_mode
+
+        self.brake_penalty_reward = brake_penalty_reward
+        self.brake_penalty_th = brake_penalty_th
+        self.brake_penalty_used = False
+
+        self.speeds = []
+        self.acceleration = 0.0
+
+        self.steers = []
+        self.steer_penalty_actions_len = steer_penalty_actions_len
+        self.steer_penalty_th = steer_penalty_th
+        self.steer_penalty_reward = steer_penalty_reward
+
+        self.steer_change_rate = None
+        self.steer_penalty_used = False
 
     def _destroy(self):
         if not self.road:
@@ -532,6 +552,18 @@ class CarRacing(gym.Env, EzPickle):
             self.render()
         return self.step(None)[0], self.get_car_state()
 
+    def _add_steer(self, action):
+        self.steers.append(action)
+        if len(self.steers) > self.steer_penalty_actions_len:
+            del self.steers[0]
+
+    def _count_of_steer_change(self):
+        count = 0
+        for i in range(len(self.steers) - 1):
+            if self.steers[i + 1] != self.steers[i]:
+                count += 1
+        return count
+
     def step(self, action: Union[np.ndarray, int]):
         assert self.car is not None
         if action is not None:
@@ -539,6 +571,12 @@ class CarRacing(gym.Env, EzPickle):
                 self.car.steer(-action[0])
                 self.car.gas(action[1])
                 self.car.brake(action[2])
+
+                if action[0] < -0.5:
+                    self._add_steer(0)
+                if action[0] > 0.5:
+                    self._add_steer(1)
+
             else:
                 if not self.action_space.contains(action):
                     raise InvalidAction(
@@ -549,6 +587,9 @@ class CarRacing(gym.Env, EzPickle):
                 self.car.gas(0.2 * (action == 3))
                 self.car.brake(0.8 * (action == 4))
 
+                if action == 1 or action == 2:
+                    self._add_steer(action)
+
         self.car.step(1.0 / FPS)
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
         self.t += 1.0 / FPS
@@ -558,8 +599,38 @@ class CarRacing(gym.Env, EzPickle):
         step_reward = 0
         terminated = False
         truncated = False
+
+        self.speeds.append(self._speed())
+        if len(self.speeds) > 10:
+            del self.speeds[0]
+
+        self.brake_penalty_used = False
+        self.steer_penalty_used = False
+        self.steer_change_rate = None
+
         if action is not None:  # First step without action, called from reset()
             self.reward -= 0.1
+
+            ########################################
+
+            if self.brake_penalty_th is not None and len(self.speeds) == 10:
+                diff = self.speeds[-1] - self.speeds[0]
+                self.acceleration = diff
+                if diff < self.brake_penalty_th:
+                    self.reward += self.brake_penalty_reward
+                    self.brake_penalty_used = True
+
+            steer_change_count = self._count_of_steer_change()
+            if self.steer_penalty_th is not None:
+                self.steer_change_rate = steer_change_count / (self.steer_penalty_actions_len - 1)
+                if steer_change_count > self.steer_penalty_th:
+                    self.reward += self.steer_penalty_reward
+                    self.steer_penalty_used = True
+            else:
+                self.steer_change_rate = -1.
+
+            ########################################
+
             # We actually don't want to count fuel spent, we want car to be faster.
             # self.reward -=  10 * self.car.fuel_spent / ENGINE_POWER
             self.car.fuel_spent = 0.0
@@ -580,11 +651,24 @@ class CarRacing(gym.Env, EzPickle):
         return self.state, step_reward, terminated, truncated, self.get_car_state()
 
     def get_car_state(self):
-        return {'x': self.car.hull.position.x, 'y': self.car.hull.position.y, 'heading': self.car.hull.angle,
-                'speed': np.sqrt(
-                    np.square(self.car.hull.linearVelocity[0])
-                    + np.square(self.car.hull.linearVelocity[1])
-                )}
+        return {
+            'x': self.car.hull.position.x,
+            'y': self.car.hull.position.y,
+            'heading': self.car.hull.angle,
+            'speed': self._speed(),
+
+            'acceleration': self.acceleration,
+            'brake_penalty_used': self.brake_penalty_used,
+
+            'steer_change_rate': self.steer_change_rate,
+            'steer_penalty_used': self.steer_penalty_used
+        }
+
+    def _speed(self):
+        return np.sqrt(
+            np.square(self.car.hull.linearVelocity[0])
+            + np.square(self.car.hull.linearVelocity[1])
+        )
 
     def render(self):
         if self.render_mode is None:

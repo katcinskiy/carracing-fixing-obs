@@ -5,7 +5,7 @@ name: exp5_PPO_wrapper_thickness2
 
 env:
   wrapper:
-    use: true
+    use_custom: true
     trajectory_thickness: 2
 
 algo_name: PPO

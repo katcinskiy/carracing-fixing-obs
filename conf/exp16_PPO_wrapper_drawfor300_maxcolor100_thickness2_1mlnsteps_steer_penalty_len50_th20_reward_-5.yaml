@@ -1,7 +1,7 @@
 defaults:
   - config  # Reference the main configuration
 
-name: exp9_PPO_wrapper_drawfor300_maxcolor100_thickness2_5mlnsteps
+name: exp16_PPO_wrapper_drawfor300_maxcolor100_thickness2_1mlnsteps_steer_penalty_len50_th20_reward_-5.
 
 env:
   wrapper:
@@ -10,8 +10,14 @@ env:
     trajectory_color_max_speed: 100
     trajectory_thickness: 2
 
+eval:
+  eval_freq: 100000
+
 train:
-  total_timesteps: 5000000
+  steer_penalty_actions_len: 50
+  steer_penalty_th: 20
+  steer_penalty_reward: -5
+
 
 algo_name: PPO
 algo_cfg:

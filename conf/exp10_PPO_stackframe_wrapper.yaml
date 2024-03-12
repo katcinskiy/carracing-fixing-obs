@@ -1,0 +1,18 @@
+defaults:
+  - config  # Reference the main configuration
+
+name: exp10_PPO_stackframe_wrapper.yaml
+
+env:
+  wrapper:
+    use_custom: false
+    use_frame_stack: true
+    frame_stack_count: 6
+
+train:
+  n_envs: 10
+
+algo_name: PPO
+algo_cfg:
+  n_steps: 2000
+  n_epochs: 10

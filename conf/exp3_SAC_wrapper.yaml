@@ -5,7 +5,7 @@ name: exp3_SAC_wrapper
 
 env:
   wrapper:
-    use: true
+    use_custom: true
 
 algo_name: SAC
 algo_cfg:

@@ -11,7 +11,7 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 from callbacks.eval_callback import EvalCallback
 from conf.config_models import AppConfig
 from env.car_racing import CarRacing, set_obs_width_height
-from wrapper.env_wrapper import CustomEnvWrapper
+from wrapper.env_wrapper import CustomEnvWrapper, StackWrapper
 
 cs = ConfigStore.instance()
 cs.store(name="base_config", node=AppConfig)
@@ -55,13 +55,23 @@ def my_app(cfg: AppConfig) -> None:
 
     set_obs_width_height(cfg.env.obs_width, cfg.env.obs_height)
 
-    if cfg.env.wrapper.use:
+    env_base_config = {
+        'verbose': False,
+        'domain_randomize': cfg.env.domain_randomize,
+        'continuous': cfg.env.continuous,
+        'brake_penalty_reward': cfg.train.brake_penalty_reward,
+        'brake_penalty_th': cfg.train.brake_penalty_th,
+
+        'steer_penalty_actions_len': cfg.train.steer_penalty_actions_len,
+        'steer_penalty_th': cfg.train.steer_penalty_th,
+        'steer_penalty_reward': cfg.train.steer_penalty_reward,
+    }
+
+    if cfg.env.wrapper.use_custom:
         base_env_fun = lambda: CustomEnvWrapper(
             gym.wrappers.TimeLimit(
                 CarRacing(
-                    verbose=False,
-                    domain_randomize=cfg.env.domain_randomize,
-                    continuous=cfg.env.continuous
+                    **env_base_config
                 ),
                 cfg.env.max_episode_steps
             ),
@@ -70,12 +80,10 @@ def my_app(cfg: AppConfig) -> None:
             draw_for_last=cfg.env.wrapper.draw_for_last,
         )
 
-        eval_env = CustomEnvWrapper(
+        eval_env_fn = lambda: CustomEnvWrapper(
             gym.wrappers.TimeLimit(
                 CarRacing(
-                    verbose=False,
-                    domain_randomize=cfg.env.domain_randomize,
-                    continuous=cfg.env.continuous,
+                    **env_base_config,
                     render_mode='rgb_array'
                 ),
                 cfg.env.max_episode_steps
@@ -84,25 +92,48 @@ def my_app(cfg: AppConfig) -> None:
             trajectory_thickness=cfg.env.wrapper.trajectory_thickness,
             draw_for_last=cfg.env.wrapper.draw_for_last,
         )
+    elif cfg.env.wrapper.use_frame_stack:
+        base_env_fun = lambda: StackWrapper(
+            gym.wrappers.TimeLimit(
+                CarRacing(
+                    **env_base_config
+                ),
+                cfg.env.max_episode_steps
+            ),
+            cfg.env.wrapper.frame_stack_count
+        )
+
+        eval_env_fn = lambda: StackWrapper(
+            gym.wrappers.TimeLimit(
+                CarRacing(
+                    **env_base_config,
+                    render_mode='rgb_array'
+                ),
+                cfg.env.max_episode_steps
+            ),
+            cfg.env.wrapper.frame_stack_count
+        )
     else:
         base_env_fun = lambda: gym.wrappers.TimeLimit(
             CarRacing(
-                verbose=False,
-                domain_randomize=cfg.env.domain_randomize,
-                continuous=cfg.env.continuous
+                **env_base_config
             ),
             cfg.env.max_episode_steps
         )
 
-        eval_env = gym.wrappers.TimeLimit(
+        eval_env_fn = lambda: gym.wrappers.TimeLimit(
             CarRacing(
-                verbose=False,
-                domain_randomize=cfg.env.domain_randomize,
-                continuous=cfg.env.continuous,
+                **env_base_config,
                 render_mode='rgb_array'
             ),
             cfg.env.max_episode_steps
         )
+
+    eval_env = make_vec_env(
+        eval_env_fn,
+        n_envs=cfg.eval.n_eval_episodes,
+        vec_env_cls=SubprocVecEnv
+    )
 
     if cfg.train.n_envs == 1:
         env = make_vec_env(base_env_fun, n_envs=1)

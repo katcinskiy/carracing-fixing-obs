@@ -76,3 +76,27 @@ class CustomEnvWrapper(gym.Wrapper):
             cv2.line(frame, item, points_inside[index + 1],
                      self.interpolate_color(car_states[len(points_inside) - index - 1]['speed']),
                      self.trajectory_thickness)
+
+
+class StackWrapper(gym.Wrapper):
+    def __init__(self, env, count):
+        super(StackWrapper, self).__init__(env)
+        self.observation_space = Box(low=0, high=255, shape=(*self.observation_space.shape[:2], count), dtype=np.uint8)
+        self.count = count
+        self.stacked_state = None
+
+    def reset(self, **kwargs):
+        obs, info = self.env.reset(**kwargs)
+        obs = rgb2gray(obs)
+
+        self.stacked_state = np.tile(obs, (1, 1, self.count))
+
+        return self.stacked_state, info
+
+    def step(self, action):
+        modified_action = action
+        observation, reward, truncated, done, info = self.env.step(modified_action)
+        obs = rgb2gray(observation)
+        self.stacked_state = np.concatenate((self.stacked_state[..., 1:], obs), axis=2)
+
+        return self.stacked_state, reward, truncated, done, info

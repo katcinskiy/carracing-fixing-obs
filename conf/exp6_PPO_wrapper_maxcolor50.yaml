@@ -5,7 +5,7 @@ name: exp6_PPO_wrapper_maxcolor50
 
 env:
   wrapper:
-    use: true
+    use_custom: true
     trajectory_color_max_speed: 50
 
 algo_name: PPO

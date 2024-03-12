@@ -1,7 +1,7 @@
 defaults:
   - config  # Reference the main configuration
 
-name: exp9_PPO_wrapper_drawfor300_maxcolor100_thickness2_5mlnsteps
+name: exp13_PPO_wrapper_drawfor300_maxcolor100_thickness2_1mlnsteps_brake_penalty_-50_th_-20
 
 env:
   wrapper:
@@ -11,7 +11,10 @@ env:
     trajectory_thickness: 2
 
 train:
-  total_timesteps: 5000000
+  total_timesteps: 1000000
+  brake_penalty_reward: -50.0
+  brake_penalty_th: -20.0
+
 
 algo_name: PPO
 algo_cfg:

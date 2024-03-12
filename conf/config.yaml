@@ -2,10 +2,12 @@ name: PPO_1
 log_dir: ./logs/${name}
 env:
   wrapper:
-    use: true
+    use_custom: true
     trajectory_color_max_speed: 75
     trajectory_thickness: 1
     draw_for_last: 100
+    use_frame_stack: true
+    frame_stack_count: 4
   max_episode_steps: 1000
   domain_randomize: false
   continuous: true
@@ -13,7 +15,12 @@ env:
   obs_height: 100
 train:
   total_timesteps: 1000000
-  n_envs: 10
+  n_envs: 8
+  brake_penalty_reward: null
+  brake_penalty_th: null
+  steer_penalty_actions_len: null
+  steer_penalty_th: null
+  steer_penalty_reward: null
 eval:
   video_save_path: ${log_dir}/videos/
   model_save_path: ${log_dir}/models/
